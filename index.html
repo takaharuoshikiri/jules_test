@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>カロリー計算アプリ</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>カロリー計算</h1>
+
+    <div>
+        <label for="food-item">食べ物:</label>
+        <input type="text" id="food-item" placeholder="例: りんご">
+    </div>
+
+    <div>
+        <label for="calories">カロリー:</label>
+        <input type="number" id="calories" placeholder="例: 100">
+    </div>
+
+    <button id="add-button">追加</button>
+
+    <h2>記録された食べ物</h2>
+    <ul id="food-list">
+        <!-- ここに食べ物が追加されます -->
+    </ul>
+
+    <h2>合計カロリー</h2>
+    <p id="total-calories">0 kcal</p>
+
+    <script src="script.js"></script>
+</body>
+</html>
