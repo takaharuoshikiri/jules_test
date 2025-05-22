@@ -15,6 +15,8 @@
 - `style.css`: アプリケーションのスタイリング用CSSファイル
 - `script.js`: アプリケーションの動作ロジックを記述したJavaScriptファイル
 - `test.html`: JavaScriptのロジックをテストするためのユニットテストファイル
+- `app.py`: Python Flask backend server
+- `requirements.txt`: Python dependencies
 
 ## 使用方法
 
@@ -35,3 +37,27 @@
 - HTML
 - CSS
 - JavaScript (ES6)
+- Python (Flask)
+- Google Gemini API
+
+## Backend Setup and Usage
+
+### 1. Install Dependencies
+Install the required Python packages using pip:
+```bash
+pip install -r requirements.txt
+```
+
+### 2. Set API Key
+Set your Gemini API key as an environment variable named `GEMINI_API_KEY`. For example, in bash:
+```bash
+export GEMINI_API_KEY='YOUR_API_KEY'
+```
+Replace `YOUR_API_KEY` with your actual Gemini API key.
+
+### 3. Run the Backend Server
+Run the Flask backend server using:
+```bash
+python app.py
+```
+The server will start by default on `http://127.0.0.1:5000`. The frontend application expects to communicate with the backend at the `/api/getMenuSuggestions` endpoint (i.e., `http://127.0.0.1:5000/api/getMenuSuggestions`).
