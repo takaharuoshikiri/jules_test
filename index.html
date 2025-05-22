@@ -5,9 +5,32 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>カロリー計算アプリ</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>カロリー計算</h1>
+
+    <div id="target-intake-settings">
+        <h2>目標摂取量設定</h2>
+        <div>
+            <label for="target-calories">目標カロリー (kcal):</label>
+            <input type="number" id="target-calories" placeholder="例: 2000" min="0">
+        </div>
+        <div>
+            <label for="target-protein">目標タンパク質 (g):</label>
+            <input type="number" id="target-protein" placeholder="例: 70" min="0">
+        </div>
+        <div>
+            <label for="target-lipid">目標脂質 (g):</label>
+            <input type="number" id="target-lipid" placeholder="例: 60" min="0">
+        </div>
+        <div>
+            <label for="target-carbohydrate">目標炭水化物 (g):</label>
+            <input type="number" id="target-carbohydrate" placeholder="例: 250" min="0">
+        </div>
+        <button id="save-targets-button">目標を保存/更新</button>
+    </div>
+    <hr>
 
     <div>
         <label for="food-item">食べ物:</label>
@@ -43,6 +66,18 @@
 
     <h2>合計カロリー</h2>
     <p id="total-calories">0 kcal</p>
+
+    <div id="nutrition-summary">
+        <h2>栄養バランス概要</h2>
+        <div>
+            <h3>摂取量 vs 目標量</h3>
+            <canvas id="intakeComparisonChart"></canvas>
+        </div>
+        <div>
+            <h3>PFCバランス</h3>
+            <canvas id="pfcBalanceChart"></canvas>
+        </div>
+    </div>
 
     <script src="script.js"></script>
 </body>
