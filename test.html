@@ -20,6 +20,9 @@
         document.body.innerHTML += `
             <input type="text" id="food-item">
             <input type="number" id="calories">
+            <input type="number" id="protein">
+            <input type="number" id="lipid">
+            <input type="number" id="carbohydrate">
             <button id="add-button">追加</button>
             <ul id="food-list"></ul>
             <p id="total-calories">0 kcal</p>
@@ -159,13 +162,93 @@ ${error.stack}`;
             foodItemInput.value = "テストフード";
             caloriesInput.value = "-50";
             const originalAlert = window.alert;
-            window.alert = (message) => console.log("Alert (mocked):", message);
+            let alertCalled = false;
+            window.alert = (message) => {
+                console.log("Alert (mocked):", message);
+                alertCalled = true;
+            };
             addButton.click();
             window.alert = originalAlert;
 
-            return items.length === initialItemCount || "Item with negative calories was added.";
+            return items.length === initialItemCount && alertCalled || `Item with negative calories was added or alert not called. Items: ${items.length}, Alert: ${alertCalled}`;
         });
 
+        runTest("食べ物と全ての栄養素を追加するとリストに正しく表示され、合計カロリーが更新されること", () => {
+            items = []; renderItems(); updateTotalCalories(); // Reset state
+
+            const foodItemInput = document.getElementById('food-item');
+            const caloriesInput = document.getElementById('calories');
+            const proteinInput = document.getElementById('protein');
+            const lipidInput = document.getElementById('lipid');
+            const carbohydrateInput = document.getElementById('carbohydrate');
+            const addButton = document.getElementById('add-button');
+            const foodList = document.getElementById('food-list');
+            const totalCaloriesDisplay = document.getElementById('total-calories');
+
+            foodItemInput.value = "チキンサラダ";
+            caloriesInput.value = "350";
+            proteinInput.value = "30";
+            lipidInput.value = "15";
+            carbohydrateInput.value = "20";
+            addButton.click();
+
+            if (items.length !== 1) return "Item not added to items array. Count: " + items.length;
+            const item = items[0];
+            if (item.name !== "チキンサラダ" || item.calories !== 350 || item.protein !== 30 || item.lipid !== 15 || item.carbohydrate !== 20) {
+                return "Item data not stored correctly. Found: " + JSON.stringify(item);
+            }
+
+            let itemListedCorrectly = foodList.children.length === 1 && foodList.children[0].textContent.includes("チキンサラダ: 350 kcal (P: 30g, F: 15g, C: 20g)");
+            if (!itemListedCorrectly) return "Item not listed correctly with all nutrients. Found: " + foodList.innerHTML;
+            
+            let totalCaloriesCorrect = totalCaloriesDisplay.textContent === "350 kcal";
+            if (!totalCaloriesCorrect) return "Total calories not updated correctly. Found: " + totalCaloriesDisplay.textContent;
+            
+            return true;
+        });
+
+        runTest("renderItemsが栄養素を正しく表示すること", () => {
+            items = [{ name: 'Render Test Food', calories: 120, protein: 12, lipid: 6, carbohydrate: 22 }];
+            renderItems(); // Directly call renderItems from script.js
+            const foodList = document.getElementById('food-list');
+            const expectedText = "Render Test Food: 120 kcal (P: 12g, F: 6g, C: 22g)";
+            if (foodList.children.length === 1 && foodList.children[0].textContent.includes(expectedText)) {
+                return true;
+            }
+            return "renderItems did not display macronutrients correctly. Found: " + foodList.innerHTML;
+        });
+        
+        runTest("無効な入力（負のタンパク質）は追加されないこと", () => {
+            items = []; renderItems(); updateTotalCalories(); // Reset state
+            const initialItemCount = items.length;
+
+            const foodItemInput = document.getElementById('food-item');
+            const caloriesInput = document.getElementById('calories');
+            const proteinInput = document.getElementById('protein');
+            const lipidInput = document.getElementById('lipid');
+            const carbohydrateInput = document.getElementById('carbohydrate');
+            const addButton = document.getElementById('add-button');
+
+            foodItemInput.value = "不良タンパク質食品";
+            caloriesInput.value = "100";
+            proteinInput.value = "-5"; // Invalid
+            lipidInput.value = "10";
+            carbohydrateInput.value = "20";
+
+            const originalAlert = window.alert;
+            let alertCalled = false;
+            window.alert = (message) => {
+                console.log("Alert (mocked for test):", message);
+                alertCalled = true;
+            };
+            addButton.click();
+            window.alert = originalAlert; // Restore original alert
+
+            if (items.length === initialItemCount && alertCalled) {
+                return true;
+            }
+            return `Item with negative protein was added or alert not called. Items count: ${items.length}, Alert called: ${alertCalled}`;
+        });
 
         // Summary
         const summaryDiv = document.createElement('h3');
