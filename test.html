@@ -9,6 +9,7 @@
         .fail { color: red; }
         pre { background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>カロリー計算アプリ - ユニットテスト</h1>
@@ -26,6 +27,17 @@
             <button id="add-button">追加</button>
             <ul id="food-list"></ul>
             <p id="total-calories">0 kcal</p>
+
+            <!-- Mock elements for target setting -->
+            <input type="number" id="target-calories">
+            <input type="number" id="target-protein">
+            <input type="number" id="target-lipid">
+            <input type="number" id="target-carbohydrate">
+            <button id="save-targets-button">目標を保存/更新</button>
+
+            <!-- Mock canvas elements for charts -->
+            <canvas id="intakeComparisonChart"></canvas>
+            <canvas id="pfcBalanceChart"></canvas>
         `;
     </script>
     <script src="script.js"></script>
@@ -249,6 +261,171 @@ ${error.stack}`;
             }
             return `Item with negative protein was added or alert not called. Items count: ${items.length}, Alert called: ${alertCalled}`;
         });
+
+        runTest("目標摂取量の設定と取得", () => {
+            const tcInput = document.getElementById('target-calories');
+            const tpInput = document.getElementById('target-protein');
+            const tlInput = document.getElementById('target-lipid');
+            const tcarbInput = document.getElementById('target-carbohydrate');
+            const saveButton = document.getElementById('save-targets-button');
+
+            // Store original alert and mock it
+            const originalAlert = window.alert;
+            let alertMessage = "";
+            window.alert = (msg) => { alertMessage = msg; console.log("Alert (mocked):", msg); };
+
+            // Set valid values
+            tcInput.value = "2000";
+            tpInput.value = "70";
+            tlInput.value = "60";
+            tcarbInput.value = "250";
+            saveButton.click();
+
+            // Directly access global variables from script.js (assuming they are exposed for testing or accessible in this scope)
+            // These are 'targetCalories', 'targetProtein', etc. defined in script.js
+            if (targetCalories !== 2000 || targetProtein !== 70 || targetLipid !== 60 || targetCarbohydrate !== 250) {
+                window.alert = originalAlert;
+                return "Valid target values not saved correctly. Found: TC=" + targetCalories + ", TP=" + targetProtein + ", TL=" + targetLipid + ", TCarb=" + targetCarbohydrate;
+            }
+            if (alertMessage !== "目標摂取量が保存されました！") {
+                 window.alert = originalAlert;
+                 return "Success alert not shown for valid targets. Alert: " + alertMessage;
+            }
+
+            // Test invalid input (negative value)
+            alertMessage = ""; // Reset alert message
+            tpInput.value = "-10"; // Invalid protein
+            saveButton.click();
+
+            if (targetProtein === -10) { // Should not update to invalid
+                window.alert = originalAlert;
+                return "Target protein updated to invalid value -10.";
+            }
+            if (targetProtein !== 70) { // Should retain previous valid value
+                window.alert = originalAlert;
+                return "Target protein did not retain its previous valid value. Found: " + targetProtein;
+            }
+             if (alertMessage !== "すべての目標値は有効な正の数値で入力してください。") {
+                window.alert = originalAlert;
+                return "Validation alert for negative target not shown correctly. Alert: " + alertMessage;
+            }
+
+            window.alert = originalAlert; // Restore original alert
+            return true;
+        });
+
+        runTest("複数操作後の総主要栄養素計算の検証", () => {
+            items = []; // Reset items
+            const foodItemInput = document.getElementById('food-item');
+            const caloriesInput = document.getElementById('calories');
+            const proteinInput = document.getElementById('protein');
+            const lipidInput = document.getElementById('lipid');
+            const carbohydrateInput = document.getElementById('carbohydrate');
+            const addButton = document.getElementById('add-button');
+
+            // Add item 1
+            foodItemInput.value = "チキン"; proteinInput.value = "30"; lipidInput.value = "10"; carbohydrateInput.value = "0"; caloriesInput.value = "200";
+            addButton.click();
+            // Add item 2
+            foodItemInput.value = "ライス"; proteinInput.value = "5"; lipidInput.value = "1"; carbohydrateInput.value = "40"; caloriesInput.value = "200";
+            addButton.click();
+
+            // Directly access global total variables from script.js
+            // These are 'totalProtein', 'totalLipid', 'totalCarbohydrate'
+            if (totalProtein !== 35 || totalLipid !== 11 || totalCarbohydrate !== 40) {
+                return `Total macronutrients incorrect. Expected P:35, L:11, C:40. Found P:${totalProtein}, L:${totalLipid}, C:${totalCarbohydrate}`;
+            }
+            return true;
+        });
+
+        runTest("PFCバランス計算の検証 (calculatePFCBalance)", () => {
+            // Manually set global total nutrient values (assuming they are accessible)
+            totalProtein = 50; // 200 kcal
+            totalLipid = 20;   // 180 kcal
+            totalCarbohydrate = 100; // 400 kcal
+            // Total macro calories = 200 + 180 + 400 = 780 kcal
+
+            const pfc = calculatePFCBalance(); // Assuming calculatePFCBalance is accessible
+
+            const expectedP = (200 / 780) * 100;
+            const expectedL = (180 / 780) * 100;
+            const expectedC = (400 / 780) * 100;
+
+            // Check with a tolerance for floating point comparisons
+            if (Math.abs(pfc.protein - expectedP) > 0.01 ||
+                Math.abs(pfc.lipid - expectedL) > 0.01 ||
+                Math.abs(pfc.carbohydrate - expectedC) > 0.01) {
+                return `PFC calculation incorrect. Expected P:${expectedP.toFixed(2)} L:${expectedL.toFixed(2)} C:${expectedC.toFixed(2)}. Found P:${pfc.protein.toFixed(2)} L:${pfc.lipid.toFixed(2)} C:${pfc.carbohydrate.toFixed(2)}`;
+            }
+
+            // Test edge case: zero macronutrients
+            totalProtein = 0; totalLipid = 0; totalCarbohydrate = 0;
+            const pfcZero = calculatePFCBalance();
+            if (pfcZero.protein !== 0 || pfcZero.lipid !== 0 || pfcZero.carbohydrate !== 0) {
+                return `PFC calculation for zero macros incorrect. Expected all 0. Found P:${pfcZero.protein} L:${pfcZero.lipid} C:${pfcZero.carbohydrate}`;
+            }
+            return true;
+        });
+        
+        runTest("チャート更新関数 (updateCharts) の呼び出し検証", () => {
+            let updateChartsCalled = false;
+            const originalUpdateCharts = window.updateCharts; // Assuming updateCharts is exposed on window for testing
+
+            // Spy on updateCharts
+            window.updateCharts = () => {
+                updateChartsCalled = true;
+                if (originalUpdateCharts) originalUpdateCharts(); // Call original if it exists and you want charts to actually render
+            };
+
+            // Test after addItem
+            updateChartsCalled = false;
+            document.getElementById('food-item').value = "Test chart food";
+            document.getElementById('calories').value = "10";
+            document.getElementById('protein').value = "1";
+            document.getElementById('lipid').value = "1";
+            document.getElementById('carbohydrate').value = "1";
+            document.getElementById('add-button').click();
+            if (!updateChartsCalled) {
+                window.updateCharts = originalUpdateCharts;
+                return "updateCharts not called after addItem";
+            }
+
+            // Test after deleteItem (requires an item to be present)
+            updateChartsCalled = false;
+            if (items.length > 0) {
+                const foodList = document.getElementById('food-list');
+                if (foodList.children.length > 0 && foodList.children[0].querySelector('button')) {
+                     foodList.children[0].querySelector('button').click(); // Click delete on the first item
+                     if (!updateChartsCalled) {
+                         window.updateCharts = originalUpdateCharts;
+                         return "updateCharts not called after deleteItem";
+                     }
+                } else {
+                    console.warn("Skipping deleteItem chart call test: no item or delete button found.");
+                }
+            } else {
+                 console.warn("Skipping deleteItem chart call test: no items to delete.");
+            }
+
+
+            // Test after saveTargets
+            updateChartsCalled = false;
+            document.getElementById('target-calories').value = "2100";
+            document.getElementById('save-targets-button').click();
+             const originalAlert = window.alert; // Mock alert for this part
+             window.alert = () => {};
+            if (!updateChartsCalled) {
+                window.updateCharts = originalUpdateCharts;
+                window.alert = originalAlert;
+                return "updateCharts not called after saveTargets";
+            }
+            window.alert = originalAlert;
+
+
+            window.updateCharts = originalUpdateCharts; // Restore original function
+            return true;
+        });
+
 
         // Summary
         const summaryDiv = document.createElement('h3');
