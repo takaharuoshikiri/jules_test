@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>カロリー計算アプリ - テスト</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; }
+        .pass { color: green; }
+        .fail { color: red; }
+        pre { background-color: #f0f0f0; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>カロリー計算アプリ - ユニットテスト</h1>
+    <div id="test-results"></div>
+
+    <!-- Include the script to be tested -->
+    <script>
+        // Mocking DOM elements that script.js interacts with
+        document.body.innerHTML += `
+            <input type="text" id="food-item">
+            <input type="number" id="calories">
+            <button id="add-button">追加</button>
+            <ul id="food-list"></ul>
+            <p id="total-calories">0 kcal</p>
+        `;
+    </script>
+    <script src="script.js"></script>
+    <script>
+        const testResultsDiv = document.getElementById('test-results');
+        let testCount = 0;
+        let passCount = 0;
+
+        function runTest(description, testFn) {
+            testCount++;
+            let result = false;
+            let error = null;
+            try {
+                result = testFn();
+            } catch (e) {
+                error = e;
+            }
+
+            const resultDiv = document.createElement('div');
+            if (result === true) {
+                passCount++;
+                resultDiv.className = 'pass';
+                resultDiv.textContent = `PASS: ${description}`;
+            } else {
+                resultDiv.className = 'fail';
+                resultDiv.textContent = `FAIL: ${description}`;
+                if(error) {
+                    const errorDetails = document.createElement('pre');
+                    errorDetails.textContent = `Error: ${error.message}
+${error.stack}`;
+                    resultDiv.appendChild(errorDetails);
+                } else if (result !== true && typeof result === 'string') {
+                    // If the test function returns a string, it's an assertion message
+                    const assertionDetails = document.createElement('pre');
+                    assertionDetails.textContent = `Assertion: ${result}`;
+                    resultDiv.appendChild(assertionDetails);
+                }
+            }
+            testResultsDiv.appendChild(resultDiv);
+        }
+
+        // --- Test Cases ---
+
+        runTest("初期状態の合計カロリーが0であること", () => {
+            // Re-initialize state for this test if necessary by resetting items array and totalCalories
+            // For simplicity, we rely on the script.js initial state here.
+            // A more robust test setup might involve functions to reset state.
+            const totalCaloriesDisplay = document.getElementById('total-calories');
+            return totalCaloriesDisplay.textContent === "0 kcal";
+        });
+
+        runTest("食べ物を追加するとリストに表示され、合計カロリーが更新されること", () => {
+            const foodItemInput = document.getElementById('food-item');
+            const caloriesInput = document.getElementById('calories');
+            const addButton = document.getElementById('add-button');
+            const foodList = document.getElementById('food-list');
+            const totalCaloriesDisplay = document.getElementById('total-calories');
+
+            // Clear previous state if any from other tests or manual interaction
+            items = []; // Accessing global 'items' from script.js
+            renderItems(); // Accessing global 'renderItems' from script.js
+            updateTotalCalories(); // Accessing global 'updateTotalCalories' from script.js
+
+
+            foodItemInput.value = "バナナ";
+            caloriesInput.value = "86";
+            addButton.click();
+
+            let itemListedCorrectly = foodList.children.length === 1 && foodList.children[0].textContent.includes("バナナ: 86 kcal");
+            let totalCaloriesCorrect = totalCaloriesDisplay.textContent === "86 kcal";
+            
+            if (!itemListedCorrectly) return "Item not listed correctly. Found: " + foodList.innerHTML;
+            if (!totalCaloriesCorrect) return "Total calories not updated correctly. Found: " + totalCaloriesDisplay.textContent;
+
+            // Add another item
+            foodItemInput.value = "ヨーグルト";
+            caloriesInput.value = "58";
+            addButton.click();
+
+            itemListedCorrectly = foodList.children.length === 2 && foodList.children[1].textContent.includes("ヨーグルト: 58 kcal");
+            totalCaloriesCorrect = totalCaloriesDisplay.textContent === "144 kcal"; // 86 + 58
+
+            if (!itemListedCorrectly) return "Second item not listed correctly. Found: " + foodList.innerHTML;
+            if (!totalCaloriesCorrect) return "Total calories not updated correctly after second item. Found: " + totalCaloriesDisplay.textContent;
+            
+            return true;
+        });
+
+        runTest("食べ物を削除するとリストから消え、合計カロリーが更新されること", () => {
+            // Assumes state from previous test or requires setup
+            // For simplicity, let's re-add items to ensure a known state.
+            items = [];
+            foodItemInput.value = "りんご"; caloriesInput.value = "52"; addButton.click();
+            foodItemInput.value = "オレンジ"; caloriesInput.value = "47"; addButton.click();
+            
+            const foodList = document.getElementById('food-list');
+            const totalCaloriesDisplay = document.getElementById('total-calories');
+
+            if (foodList.children.length !== 2) return "Initial items for delete test not added correctly.";
+
+            // Delete the first item ("りんご")
+            const firstItemDeleteButton = foodList.children[0].querySelector('button');
+            if (!firstItemDeleteButton) return "Delete button not found for the first item.";
+            firstItemDeleteButton.click();
+
+            let itemDeletedCorrectly = foodList.children.length === 1 && foodList.children[0].textContent.includes("オレンジ: 47 kcal");
+            let totalCaloriesCorrectAfterDelete = totalCaloriesDisplay.textContent === "47 kcal";
+
+            if (!itemDeletedCorrectly) return "Item not deleted correctly. Remaining items: " + foodList.innerHTML;
+            if (!totalCaloriesCorrectAfterDelete) return "Total calories not updated correctly after delete. Found: " + totalCaloriesDisplay.textContent;
+
+            return true;
+        });
+        
+        runTest("無効な入力（空の食べ物名）は追加されないこと", () => {
+            items = []; renderItems(); updateTotalCalories(); // Reset state
+            const initialItemCount = items.length;
+
+            foodItemInput.value = "";
+            caloriesInput.value = "100";
+            // Mock alert so the test doesn't hang
+            const originalAlert = window.alert;
+            window.alert = (message) => console.log("Alert (mocked):", message);
+            addButton.click();
+            window.alert = originalAlert; // Restore original alert
+
+            return items.length === initialItemCount || "Item with empty name was added.";
+        });
+
+        runTest("無効な入力（負のカロリー）は追加されないこと", () => {
+            items = []; renderItems(); updateTotalCalories(); // Reset state
+            const initialItemCount = items.length;
+
+            foodItemInput.value = "テストフード";
+            caloriesInput.value = "-50";
+            const originalAlert = window.alert;
+            window.alert = (message) => console.log("Alert (mocked):", message);
+            addButton.click();
+            window.alert = originalAlert;
+
+            return items.length === initialItemCount || "Item with negative calories was added.";
+        });
+
+
+        // Summary
+        const summaryDiv = document.createElement('h3');
+        summaryDiv.textContent = `Test Summary: ${passCount} / ${testCount} passed.`;
+        testResultsDiv.insertBefore(summaryDiv, testResultsDiv.firstChild);
+
+    </script>
+</body>
+</html>
