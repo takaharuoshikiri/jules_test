@@ -12,6 +12,10 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
+    <!-- AI Menu Suggestions elements - ensure these are in the mock DOM -->
+    <button id="get-suggestions-button">おすすめメニューを見る</button>
+    <div id="menu-suggestions"></div>
+
     <h1>カロリー計算アプリ - ユニットテスト</h1>
     <div id="test-results"></div>
 
@@ -38,6 +42,10 @@
             <!-- Mock canvas elements for charts -->
             <canvas id="intakeComparisonChart"></canvas>
             <canvas id="pfcBalanceChart"></canvas>
+
+            <!-- Ensure AI Menu Suggestions elements are also mocked if not already -->
+            <button id="get-suggestions-button">おすすめメニューを見る</button>
+            <div id="menu-suggestions"><p>クリックしてメニュー提案を取得します。</p></div>
         `;
     </script>
     <script src="script.js"></script>
@@ -425,6 +433,139 @@ ${error.stack}`;
             window.updateCharts = originalUpdateCharts; // Restore original function
             return true;
         });
+
+        // --- AI Menu Suggestions Tests ---
+        (async () => {
+            const suggestionsButton = document.getElementById('get-suggestions-button');
+            const suggestionsDiv = document.getElementById('menu-suggestions');
+            const originalFetch = window.fetch;
+            let lastRequestBody = null;
+
+            // Helper to wait for next tick, allowing promises to resolve
+            const nextTick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+            // Mock fetch setup
+            const mockFetch = async (url, options) => {
+                if (url === '/api/getMenuSuggestions') {
+                    lastRequestBody = options.body; // Store the request body for inspection
+                    const bodyData = JSON.parse(options.body);
+
+                    // Scenario 1: Successful fetch with suggestions
+                    if (bodyData.targetIntake.calories === 2000) { // Differentiate test cases
+                        return Promise.resolve({
+                            ok: true,
+                            json: async () => ({
+                                suggestions: ["Mocked Suggestion 1: Chicken and Rice", "Mocked Suggestion 2: Veggie Omelette"]
+                            })
+                        });
+                    }
+                    // Scenario 2: Empty suggestions
+                    else if (bodyData.targetIntake.calories === 2001) {
+                        return Promise.resolve({
+                            ok: true,
+                            json: async () => ({ suggestions: [] })
+                        });
+                    }
+                    // Scenario 3: Backend error
+                    else if (bodyData.targetIntake.calories === 2002) {
+                         return Promise.resolve({
+                            ok: true,
+                            json: async () => ({ error: "Simulated backend error processing your request." })
+                        });
+                    }
+                    // Scenario 4: Network error / Non-OK response
+                    else if (bodyData.targetIntake.calories === 2003) {
+                        return Promise.resolve({
+                            ok: false,
+                            status: 500,
+                            statusText: "Simulated Network Error",
+                            json: async () => ({ error: "Simulated Network Error Details" })
+                        });
+                    }
+                }
+                return Promise.reject(new Error(`Unexpected fetch call to ${url}`));
+            };
+            
+            window.fetch = mockFetch;
+
+            // Test 1: Loading state
+            runTest("AIメニュー提案 - ローディング状態の表示", async () => {
+                // Set some global values that fetchMenuSuggestions will use
+                totalCalories = 100; targetCalories = 1999; // Use a unique value not triggering other mocks
+                suggestionsButton.click();
+                // Check immediately, before await completes in fetchMenuSuggestions
+                if (!suggestionsDiv.innerHTML.includes("提案を読み込み中...")) {
+                    return "Loading message not shown immediately. Found: " + suggestionsDiv.innerHTML;
+                }
+                await nextTick(); // Allow microtasks (like promise in fetchMenuSuggestions) to run
+                return true;
+            });
+            
+            // Test 2: Successful fetch and display
+            runTest("AIメニュー提案 - 成功時の提案表示", async () => {
+                totalCalories = 1500; targetCalories = 2000; // Triggers success mock
+                totalProtein = 50; targetProtein = 70;
+                totalLipid = 40; targetLipid = 60;
+                totalCarbohydrate = 200; targetCarbohydrate = 250;
+
+                suggestionsButton.click();
+                await nextTick(); // Wait for promises to resolve
+
+                if (!suggestionsDiv.innerHTML.includes("<li>Mocked Suggestion 1: Chicken and Rice</li>")) {
+                    return "Suggestions not displayed correctly. Found: " + suggestionsDiv.innerHTML;
+                }
+                if (!suggestionsDiv.innerHTML.includes("<li>Mocked Suggestion 2: Veggie Omelette</li>")) {
+                    return "Suggestions not displayed correctly. Found: " + suggestionsDiv.innerHTML;
+                }
+                // Verify request payload structure (optional, but good for sanity check)
+                const expectedPayload = {
+                    currentIntake: { calories: 1500, protein: 50, lipid: 40, carbohydrate: 200 },
+                    targetIntake: { calories: 2000, protein: 70, lipid: 60, carbohydrate: 250 }
+                };
+                if (JSON.stringify(JSON.parse(lastRequestBody)) !== JSON.stringify(expectedPayload)) {
+                    return "Request payload mismatch. Sent: " + lastRequestBody;
+                }
+                return true;
+            });
+
+            // Test 3: Empty suggestions
+            runTest("AIメニュー提案 - 提案がない場合のメッセージ表示", async () => {
+                targetCalories = 2001; // Triggers empty suggestions mock
+                suggestionsButton.click();
+                await nextTick();
+                if (!suggestionsDiv.innerHTML.includes("利用可能な提案はありません。")) {
+                    return "Empty suggestions message not shown. Found: " + suggestionsDiv.innerHTML;
+                }
+                return true;
+            });
+
+            // Test 4: Backend error
+            runTest("AIメニュー提案 - バックエンドエラーメッセージの表示", async () => {
+                targetCalories = 2002; // Triggers backend error mock
+                suggestionsButton.click();
+                await nextTick();
+                if (!suggestionsDiv.innerHTML.includes("エラー: Simulated backend error processing your request.")) {
+                    return "Backend error message not shown. Found: " + suggestionsDiv.innerHTML;
+                }
+                return true;
+            });
+
+            // Test 5: Network error
+            runTest("AIメニュー提案 - ネットワークエラーメッセージの表示", async () => {
+                targetCalories = 2003; // Triggers network error mock
+                suggestionsButton.click();
+                await nextTick();
+                // The error message in script.js for a non-ok response is `提案の取得中にエラーが発生しました: HTTP error ${response.status}: ${response.statusText}`
+                // or the parsed error if response.json() for error works
+                if (!suggestionsDiv.innerHTML.includes("提案の取得中にエラーが発生しました: HTTP error 500: Simulated Network Error")) {
+                    return "Network error message not shown correctly. Found: " + suggestionsDiv.innerHTML;
+                }
+                return true;
+            });
+
+            // Restore original fetch
+            window.fetch = originalFetch;
+        })();
 
 
         // Summary

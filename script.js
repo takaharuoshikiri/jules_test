@@ -1,3 +1,41 @@
+/*
+================================================================================
+IMPORTANT: AI Menu Suggestions (Gemini API Integration) - Backend Assumptions
+================================================================================
+The AI menu suggestion feature implemented below relies on a backend service
+that is NOT part of this frontend application. The following assumptions are made:
+
+1.  **Backend Proxy Required**:
+    A backend proxy server or a serverless function is essential to interact
+    with the Gemini API. This backend component handles the actual API calls
+    to Google Gemini.
+
+2.  **API Key Security**:
+    The Gemini API key MUST be stored and used exclusively on the backend.
+    It should NEVER be embedded or exposed in this frontend JavaScript code.
+
+3.  **Backend API Endpoint**:
+    - The frontend makes a POST request to `/api/getMenuSuggestions`.
+    - **Request Body**: JSON object with `currentIntake: {calories, protein, ...}`
+      and `targetIntake: {calories, protein, ...}`.
+    - **Response Body (Success)**: JSON object with `suggestions: ["suggestion1", ...]`.
+    - **Response Body (Error)**: JSON object with `error: "message"`.
+
+4.  **Backend Responsibilities**:
+    - Securely manage the Gemini API key.
+    - Receive nutritional data from the frontend.
+    - Construct an appropriate prompt for the Gemini API.
+    - Make the API call to Gemini.
+    - Parse the Gemini API response.
+    - Format the suggestions or error messages into the JSON structure expected
+      by the frontend.
+
+5.  **CORS (Cross-Origin Resource Sharing)**:
+    If the backend service is hosted on a different domain than this frontend
+    application, it must be configured to allow CORS requests from the
+    frontend's origin.
+================================================================================
+*/
 document.addEventListener('DOMContentLoaded', () => {
     const foodItemInput = document.getElementById('food-item');
     const caloriesInput = document.getElementById('calories');
@@ -19,6 +57,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let intakeChartInstance = null;
     let pfcChartInstance = null;
 
+    // AI Menu Suggestions elements
+    const getSuggestionsButton = document.getElementById('get-suggestions-button');
+    const menuSuggestionsDiv = document.getElementById('menu-suggestions');
+
     let items = [];
     let totalCalories = 0;
     let totalProtein = 0;
@@ -33,6 +75,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
     addButton.addEventListener('click', addItem);
     saveTargetsButton.addEventListener('click', saveTargets);
+    getSuggestionsButton.addEventListener('click', fetchMenuSuggestions);
+
+    async function fetchMenuSuggestions() {
+        menuSuggestionsDiv.innerHTML = '<p>提案を読み込み中...</p>';
+
+        const requestData = {
+            currentIntake: {
+                calories: totalCalories,
+                protein: totalProtein,
+                lipid: totalLipid,
+                carbohydrate: totalCarbohydrate
+            },
+            targetIntake: {
+                calories: targetCalories,
+                protein: targetProtein,
+                lipid: targetLipid,
+                carbohydrate: targetCarbohydrate
+            }
+        };
+
+        try {
+            const response = await fetch('/api/getMenuSuggestions', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestData)
+            });
+
+            if (!response.ok) {
+                // Try to parse error from backend if available
+                let errorMsg = `HTTP error ${response.status}: ${response.statusText}`;
+                try {
+                    const errorData = await response.json();
+                    if (errorData && errorData.error) {
+                        errorMsg = errorData.error;
+                    }
+                } catch (e) {
+                    // Ignore if error response is not JSON
+                }
+                throw new Error(errorMsg);
+            }
+
+            const data = await response.json();
+
+            if (data.error) {
+                menuSuggestionsDiv.innerHTML = `<p>エラー: ${data.error}</p>`;
+            } else if (data.suggestions && Array.isArray(data.suggestions) && data.suggestions.length > 0) {
+                let suggestionsHTML = '<ul>';
+                data.suggestions.forEach(suggestion => {
+                    suggestionsHTML += `<li>${suggestion}</li>`;
+                });
+                suggestionsHTML += '</ul>';
+                menuSuggestionsDiv.innerHTML = suggestionsHTML;
+            } else {
+                menuSuggestionsDiv.innerHTML = '<p>利用可能な提案はありません。</p>';
+            }
+
+        } catch (error) {
+            console.error('Error fetching menu suggestions:', error);
+            menuSuggestionsDiv.innerHTML = `<p>提案の取得中にエラーが発生しました: ${error.message}</p>`;
+        }
+    }
 
     function saveTargets() {
         const tc = parseInt(targetCaloriesInput.value);
